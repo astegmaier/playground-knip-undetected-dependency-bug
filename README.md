@@ -1,9 +1,10 @@
 # Knip undetected-dependency bug — minimal reproduction
 
 When knip is invoked from inside a workspace package directory ("isolated
-workspace" / per-package mode) and the package is installed via a hoisting
-package manager (yarn classic, npm, or pnpm with `shamefully-hoist`), knip
-silently fails to detect missing dependency declarations.
+workspace" / per-package mode) and the package is installed via a layout that
+hoists sibling workspaces to the root `node_modules/` (npm workspaces, or
+yarn berry with `nodeLinker: node-modules`), knip silently fails to detect
+missing dependency declarations.
 
 This is the same triggering pair as
 [webpro-nl/knip#1711](https://github.com/webpro-nl/knip/issues/1711)
@@ -18,18 +19,19 @@ See `ISSUE.md` for the regression report formatted to fit the
 ```
 packages/
   fruit/
-    src/index.ts       # export const apple = 'apple';
+    src/index.js       # export const apple = 'apple';
     package.json       # name: "@scope/fruit"
   consumer/
-    src/index.ts       # import { apple } from '@scope/fruit';   ← undeclared usage
-    package.json       # devDependencies: { "knip": "6.16.1" }   ← does NOT declare @scope/fruit
-package.json           # root, workspaces: ["packages/*"]
+    src/index.js       # import { apple } from '@scope/fruit';   ← undeclared usage
+    package.json       # name: "@scope/consumer"                  ← does NOT declare @scope/fruit
+package.json           # root, workspaces: ["packages/*"], devDependencies: { "knip": "6.16.1" }
+.yarnrc.yml            # nodeLinker: node-modules
 ```
 
-Yarn classic hoists every workspace into the root `node_modules/`, so
-`@scope/fruit` is reachable from `packages/consumer` via the root
-`node_modules/@scope/fruit` symlink — even though `consumer/package.json`
-doesn't declare it.
+yarn berry (with `nodeLinker: node-modules`) symlinks every workspace into the
+root `node_modules/`, so `@scope/fruit` is reachable from `packages/consumer`
+via the root `node_modules/@scope/fruit` symlink — even though
+`consumer/package.json` doesn't declare it.
 
 ## How to verify
 
@@ -43,16 +45,21 @@ yarn install
 
 ```bash
 cd packages/consumer
-yarn knip
+yarn run -T knip
 # → exit 0, no output
 ```
 
-Expected: `Unlisted dependencies (1)  @scope/fruit  src/index.ts:1:10`.
+Expected: `Unlisted dependencies (1)  @scope/fruit  src/index.js:1:10`.
+
+The `-T` (top-level) flag is needed because yarn berry restricts binary
+lookups to packages declared in the current workspace's manifest. Since
+`@scope/consumer` doesn't (and shouldn't) declare `knip`, `-T` tells yarn
+to run the binary from the root workspace.
 
 ### Per-package mode + `--strict` — still silently passes (BUG)
 
 ```bash
-yarn knip --strict
+yarn run -T knip --strict
 # → exit 0, no output
 ```
 
@@ -72,7 +79,7 @@ yarn knip
 ```bash
 yarn knip --strict
 # → Unlisted dependencies (1)
-#     @scope/fruit  packages/consumer/src/index.ts:1:10
+#     @scope/fruit  packages/consumer/src/index.js:1:10
 # → exit 1
 ```
 
@@ -104,14 +111,14 @@ been bundled into the same PR but isn't called out in the issue thread.
 
 ```bash
 # In this repo:
-node_modules/.bin/knip --strict   # always detects, every 2.x – 6.16.1 version
+yarn knip --strict   # always detects, every 2.x – 6.16.1 version
 
 # Bisect — swap in any version and re-run the four invocations:
-npm install --no-save knip@5.6.1   # all detect ✓
-npm install --no-save knip@5.7.0   # all miss ✗
-npm install --no-save knip@5.17.0  # monorepo recovers ✓, per-pkg still broken ✗
-npm install --no-save knip@6.13.1  # same — monorepo ✓, per-pkg ✗
-npm install --no-save knip@6.14.0  # monorepo regresses again ✗
+yarn add -D knip@5.6.1   # all detect ✓
+yarn add -D knip@5.7.0   # all miss ✗
+yarn add -D knip@5.17.0  # monorepo recovers ✓, per-pkg still broken ✗
+yarn add -D knip@6.13.1  # same — monorepo ✓, per-pkg ✗
+yarn add -D knip@6.14.0  # monorepo regresses again ✗
 ```
 
 ## Root cause analysis
@@ -169,9 +176,12 @@ mode. The commit ships a test asserting this behavior.
 
 I observed this exact asymmetry in our monorepo: after removing a dependency
 declaration from two packages, `yarn knip --continue` (per-package mode, yarn
-classic hoisting) reported zero issues, while running the same analysis after
-re-installing the repo with pnpm correctly surfaced both packages as having
-unlisted dependencies.
+berry with `nodeLinker: node-modules`) reported zero issues, while running the
+same analysis after re-installing the repo with pnpm correctly surfaced both
+packages as having unlisted dependencies — because pnpm keeps workspaces in
+`.pnpm/node_modules/` rather than the hoisted root layout, so the
+sibling-workspace import is genuinely unresolvable and falls into the
+"unresolved" branch instead of the silent-drop gate.
 
 ## Suggested direction
 

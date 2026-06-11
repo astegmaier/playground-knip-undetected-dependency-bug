@@ -29,7 +29,7 @@ https://github.com/astegmaier/playground-knip-undetected-dependency-bug
 Knip silently fails to detect a missing dependency declaration when **both** of these conditions are true:
 
 1. knip is invoked from a workspace package directory (we still rely on this pattern in our monorepo for the performance reasons discussed in [#1642](https://github.com/webpro-nl/knip/issues/1642#issuecomment-4136489174) / [#1711](https://github.com/webpro-nl/knip/issues/1711)).
-2. the repo uses a "hoisting" install strategy (yarn classic, npm, or pnpm with `shamefully-hoist`), so the missing dependency is still reachable via the root `node_modules`.
+2. the repo uses an install layout that hoists sibling workspaces to the root `node_modules/` (npm workspaces, or yarn berry with `nodeLinker: node-modules`), so the missing dependency is still reachable from the consumer's `node_modules/@scope/fruit` lookup.
 
 This is the same triggering pair as [#1711](https://github.com/webpro-nl/knip/issues/1711), but a different underlying code path.
 
@@ -40,15 +40,16 @@ Given this simplified repro structure:
 ```
 packages/
   fruit/
-    src/index.ts       # export const apple = 'apple';
+    src/index.js       # export const apple = 'apple';
     package.json       # name: "@scope/fruit"
   consumer/
-    src/index.ts       # import { apple } from '@scope/fruit';   ← undeclared usage
-    package.json       # devDependencies: { "knip": "6.16.1" }   ← does NOT declare @scope/fruit
-package.json           # root, workspaces: ["packages/*"]
+    src/index.js       # import { apple } from '@scope/fruit';   ← undeclared usage
+    package.json       # name: "@scope/consumer"                  ← does NOT declare @scope/fruit
+package.json           # root, workspaces: ["packages/*"], devDependencies: { "knip": "6.16.1" }
+.yarnrc.yml            # nodeLinker: node-modules
 ```
 
-`@scope/fruit` is a sibling workspace. Yarn classic hoists it to the root `node_modules/@scope/fruit` (as a symlink to `packages/fruit`), so TS resolves the import from `packages/consumer` without complaint.
+`@scope/fruit` is a sibling workspace. yarn berry (with `nodeLinker: node-modules`) symlinks it to root `node_modules/@scope/fruit` (pointing at `packages/fruit`), so node module resolution finds the import from `packages/consumer` without complaint.
 
 You'll get these results...
 
@@ -56,16 +57,16 @@ You'll get these results...
 
 ```bash
 cd packages/consumer
-yarn knip
+yarn run -T knip
 # → exit 0, no output
 ```
 
-Expected: `Unlisted dependencies (1)  @scope/fruit  src/index.ts:1:10`.
+Expected: `Unlisted dependencies (1)  @scope/fruit  src/index.js:1:10`.
 
 ### Per-package mode + `--strict` — still silently passes (BUG)
 
 ```bash
-yarn knip --strict
+yarn run -T knip --strict
 # → exit 0, no output
 ```
 
@@ -82,7 +83,7 @@ yarn knip
 ```bash
 yarn knip --strict
 # → Unlisted dependencies (1)
-#     @scope/fruit  packages/consumer/src/index.ts:1:10
+#     @scope/fruit  packages/consumer/src/index.js:1:10
 # → exit 1
 ```
 
