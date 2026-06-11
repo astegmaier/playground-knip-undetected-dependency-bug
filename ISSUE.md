@@ -22,7 +22,7 @@ The bug also surfaces in per-package mode (`cd packages/consumer && knip`), even
 
 ## Example
 
-Given this simplified repro structure:
+Given this simplified repro structure, installed with latest yarn (`4.12.0`) with `nodeLinker: node-modules` (i.e. hoisting).
 
 ```
 packages/
