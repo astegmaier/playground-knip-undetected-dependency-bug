@@ -2,12 +2,6 @@
 
 🔄 Regression: knip fails to detect missing dependency declarations for sibling workspace packages when there is hoisting
 
-## Prerequisites
-
-- [x] I've read the relevant [documentation](https://knip.dev)
-- [x] I've searched for [existing issues](https://github.com/webpro-nl/knip/issues?q=is%3Aissue)
-- [x] I've read the [issue reproduction guide](https://knip.dev/guides/issue-reproduction)
-
 ## Reproduction url
 
 https://github.com/astegmaier/playground-knip-undetected-dependency-bug
