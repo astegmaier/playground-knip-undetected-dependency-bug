@@ -1,6 +1,8 @@
 {
   "name": "@scope/consumer",
+  "type": "module",
   "scripts": {
-    "knip": "yarn run -T knip"
+    "knip": "yarn run -T knip",
+    "test": "node src/index.js"
   }
 }

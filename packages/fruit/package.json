@@ -1,6 +1,7 @@
 {
   "name": "@scope/fruit",
   "main": "src/index.js",
+  "type": "module",
   "scripts": {
     "knip": "yarn run -T knip"
   }
