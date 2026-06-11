@@ -11,8 +11,8 @@ This is the same triggering pair as
 (per-package invocation + hoisting), but a different underlying code path —
 manifest loading there, import-graph filtering here.
 
-See `ISSUE.md` for the regression report formatted to fit the
-[knip regression-report form](https://github.com/webpro-nl/knip/issues/new?template=regression.yml).
+See [webpro-nl/knip#1792](https://github.com/webpro-nl/knip/issues/1792) for the
+regression report filed against knip.
 
 ## Repro structure
 
@@ -199,8 +199,8 @@ branch already takes.
 
 ## See also
 
-- `ISSUE.md` — draft regression report formatted for the
-  [knip regression-report form](https://github.com/webpro-nl/knip/issues/new?template=regression.yml).
+- [webpro-nl/knip#1792](https://github.com/webpro-nl/knip/issues/1792)
+  — the regression report filed against knip using this repro.
 - Related closed issue [#1711](https://github.com/webpro-nl/knip/issues/1711)
   — same triggering conditions (per-package invocation + hoisting), different
   code path (manifest loading vs. import-graph filtering).
