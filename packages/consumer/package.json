@@ -1,0 +1,7 @@
+{
+  "name": "@scope/consumer",
+  "private": true,
+  "devDependencies": {
+    "knip": "6.16.1"
+  }
+}
