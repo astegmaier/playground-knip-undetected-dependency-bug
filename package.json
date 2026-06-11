@@ -6,6 +6,7 @@
     "packages/*"
   ],
   "devDependencies": {
-    "knip": "6.16.1"
+    "knip": "6.16.1",
+    "typescript": "6.0.3"
   }
 }
