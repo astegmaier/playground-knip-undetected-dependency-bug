@@ -86,15 +86,14 @@ yarn knip --strict
 
 All three currently-failing invocations are regressions — older knip versions
 detected them. I bisected against npm-published versions using a minimal
-harness. Monorepo + `--strict` is omitted from the table since it correctly
-detects in every version 2.x – 6.16.1:
+harness:
 
-| Range | monorepo default | per-pkg default | per-pkg `--strict` | Trigger |
-|---|---|---|---|---|
-| 2.x – **5.6.1** | ✅ | ✅ | ✅ | All patterns detect |
-| **5.7.0** – 5.16.x | ❌ | ❌ | ❌ | Release notes: *"Start using `resolve` as the default module resolver"* |
-| 5.17.0 – 6.13.1 | ✅ | ❌ | ❌ | Monorepo silently recovers; per-pkg still broken |
-| **6.14.0** – 6.16.1 | ❌ | ❌ | ❌ | Monorepo regresses again — commit [`e7122a1ae`](https://github.com/webpro-nl/knip/commit/e7122a1ae74d8d43f6301b8758b7348c91fb4779) ("Don't flag undeclared sibling workspace imports as unlisted") |
+| Range | monorepo default | monorepo `--strict` | per-pkg default | per-pkg `--strict` | Trigger |
+|---|---|---|---|---|---|
+| 2.x – **5.6.1** | ✅ | ✅ | ✅ | ✅ | All patterns detect |
+| **5.7.0** – 5.16.x | ❌ | ❌ | ❌ | ❌ | Release notes: *"Start using `resolve` as the default module resolver"* |
+| 5.17.0 – 6.13.1 | ✅ | ✅ | ❌ | ❌ | Monorepo silently recovers; per-pkg still broken |
+| **6.14.0** – 6.16.1 | ❌ | ✅ | ❌ | ❌ | Monorepo default regresses again — commit [`e7122a1ae`](https://github.com/webpro-nl/knip/commit/e7122a1ae74d8d43f6301b8758b7348c91fb4779) ("Don't flag undeclared sibling workspace imports as unlisted") |
 
 The headline regression is **5.6.1 → 5.7.0**: it broke per-package mode and
 that mode has been silently broken in every release for ~15 months and
@@ -108,16 +107,23 @@ been bundled into the same PR but isn't called out in the issue thread.
 
 ### How to reproduce the bisection
 
-```bash
-# In this repo:
-yarn knip --strict   # always detects, every 2.x – 6.16.1 version
+The four invocations to re-run after each version swap (see [How to verify](#how-to-verify)
+above for full commands and expected output):
 
-# Bisect — swap in any version and re-run the four invocations:
-yarn add -D knip@5.6.1   # all detect ✓
-yarn add -D knip@5.7.0   # all miss ✗
-yarn add -D knip@5.17.0  # monorepo recovers ✓, per-pkg still broken ✗
+1. `yarn knip` from repo root — monorepo default
+2. `yarn knip --strict` from repo root — monorepo + `--strict`
+3. `cd packages/consumer && yarn knip` — per-pkg default
+4. `cd packages/consumer && yarn knip --strict` — per-pkg + `--strict`
+
+```bash
+# Bisect — swap in any version and re-run the four invocations above:
+yarn add -D knip@5.6.1   # all 4 detect ✓
+yarn add -D knip@5.7.0   # all 4 miss ✗ (yes, even monorepo + --strict)
+yarn add -D knip@5.16.0  # all 4 miss ✗ (last version in the 5.7.0–5.16.x range)
+yarn add -D knip@5.17.0  # monorepo recovers (both default and --strict) ✓, per-pkg still broken ✗
 yarn add -D knip@6.13.1  # same — monorepo ✓, per-pkg ✗
-yarn add -D knip@6.14.0  # monorepo regresses again ✗
+yarn add -D knip@6.14.0  # monorepo default regresses ✗, but monorepo + --strict still detects ✓; per-pkg still broken ✗
+yarn add -D knip@6.16.1  # same as 6.14.0 — monorepo default ✗, monorepo --strict ✓, per-pkg ✗
 ```
 
 ## Root cause analysis

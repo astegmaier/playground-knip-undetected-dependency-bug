@@ -73,11 +73,11 @@ yarn knip --strict
 
 ## Regression history
 
-I bisected this against npm-published versions using a minimal harness in the [reproduction repo](https://github.com/astegmaier/playground-knip-undetected-dependency-bug). In all cases, running `--strict` from the root correctly detects the undeclared dependency. The table below summarizes the other results:
+I bisected this against npm-published versions using a minimal harness in the [reproduction repo](https://github.com/astegmaier/playground-knip-undetected-dependency-bug). The table below summarizes the results across all four invocations:
 
-| Range | Run knip from root | Run knip from workspace package | Run knip from workspace package + `--strict` | Trigger |
-|---|---|---|---|---|
-| 2.x – **5.6.1** | ✅ | ✅ | ✅ | All patterns detect |
-| **5.7.0** – 5.16.x | ❌ | ❌ | ❌ | Release notes: *"Start using `resolve` as the default module resolver"* |
-| 5.17.0 – 6.13.1 | ✅ | ❌ | ❌ | A silently recovered (incidental side effect of a refactor); C/D still broken |
-| **6.14.0** – 6.16.1 | ❌ | ❌ | ❌ | A regressed again — commit [`e7122a1ae`](https://github.com/webpro-nl/knip/commit/e7122a1ae74d8d43f6301b8758b7348c91fb4779) deliberately suppressed sibling-workspace imports in non-strict mode |
+| Range | Run knip from root | Run knip from root + `--strict` | Run knip from workspace package | Run knip from workspace package + `--strict` | Trigger |
+|---|---|---|---|---|---|
+| 2.x – **5.6.1** | ✅ | ✅ | ✅ | ✅ | All patterns detect |
+| **5.7.0** – 5.16.x | ❌ | ❌ | ❌ | ❌ | Release notes: *"Start using `resolve` as the default module resolver"* |
+| 5.17.0 – 6.13.1 | ✅ | ✅ | ❌ | ❌ | A/B silently recovered (incidental side effect of a refactor); C/D still broken |
+| **6.14.0** – 6.16.1 | ❌ | ✅ | ❌ | ❌ | A regressed again — commit [`e7122a1ae`](https://github.com/webpro-nl/knip/commit/e7122a1ae74d8d43f6301b8758b7348c91fb4779) deliberately suppressed sibling-workspace imports in non-strict mode |
