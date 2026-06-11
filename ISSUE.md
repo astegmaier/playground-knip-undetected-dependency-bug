@@ -6,10 +6,6 @@
 
 https://github.com/astegmaier/playground-knip-undetected-dependency-bug
 
-## Reproduction access
-
-- [x] I've made sure the reproduction is publicly accessible
-
 ## Good version
 
 5.6.1
