@@ -1,3 +1,6 @@
 {
-  "name": "@scope/consumer"
+  "name": "@scope/consumer",
+  "scripts": {
+    "knip": "yarn run -T knip"
+  }
 }

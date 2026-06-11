@@ -43,8 +43,8 @@ packages/
     src/index.js       # export const apple = 'apple';
     package.json       # name: "@scope/fruit"
   consumer/
-    src/index.js       # import { apple } from '@scope/fruit';   ← undeclared usage
-    package.json       # name: "@scope/consumer"                  ← does NOT declare @scope/fruit
+    src/index.js       # import { apple } from '@scope/fruit'; ← undeclared usage
+    package.json       # does NOT declare `@scope/fruit` as a dependency
 package.json           # root, workspaces: ["packages/*"], devDependencies: { "knip": "6.16.1" }
 .yarnrc.yml            # nodeLinker: node-modules
 ```
@@ -57,8 +57,8 @@ You'll get these results...
 
 ```bash
 cd packages/consumer
-yarn run -T knip
-# → exit 0, no output
+yarn knip
+# ✂️  Excellent, Knip found no issues.
 ```
 
 Expected: `Unlisted dependencies (1)  @scope/fruit  src/index.js:1:10`.
@@ -66,8 +66,8 @@ Expected: `Unlisted dependencies (1)  @scope/fruit  src/index.js:1:10`.
 ### Per-package mode + `--strict` — still silently passes (BUG)
 
 ```bash
-yarn run -T knip --strict
-# → exit 0, no output
+yarn knip --strict
+# ✂️  Excellent, Knip found no issues.
 ```
 
 ### Monorepo mode (default) — silently passes (in knip ≥ 6.14.0)
@@ -75,7 +75,7 @@ yarn run -T knip --strict
 ```bash
 cd ../..
 yarn knip
-# → exit 0, no output
+# ✂️  Excellent, Knip found no issues.
 ```
 
 ### Monorepo mode + `--strict` — correctly detects ✓
@@ -84,7 +84,6 @@ yarn knip
 yarn knip --strict
 # → Unlisted dependencies (1)
 #     @scope/fruit  packages/consumer/src/index.js:1:10
-# → exit 1
 ```
 
 ## Regression history

@@ -45,8 +45,8 @@ yarn install
 
 ```bash
 cd packages/consumer
-yarn run -T knip
-# → exit 0, no output
+yarn knip
+# ✂️  Excellent, Knip found no issues.
 ```
 
 Expected: `Unlisted dependencies (1)  @scope/fruit  src/index.js:1:10`.
@@ -59,8 +59,8 @@ to run the binary from the root workspace.
 ### Per-package mode + `--strict` — still silently passes (BUG)
 
 ```bash
-yarn run -T knip --strict
-# → exit 0, no output
+yarn knip --strict
+# ✂️  Excellent, Knip found no issues.
 ```
 
 The silent drop happens in `packages/knip/src/graph/build.ts` before any
@@ -71,7 +71,7 @@ strict-mode logic runs, so `--strict` doesn't help.
 ```bash
 cd ../..
 yarn knip
-# → exit 0, no output
+# ✂️  Excellent, Knip found no issues.
 ```
 
 ### Monorepo mode + `--strict` — correctly detects ✓
@@ -80,7 +80,6 @@ yarn knip
 yarn knip --strict
 # → Unlisted dependencies (1)
 #     @scope/fruit  packages/consumer/src/index.js:1:10
-# → exit 1
 ```
 
 ## Regression history
