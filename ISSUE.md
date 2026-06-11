@@ -35,6 +35,12 @@ underlying code path.
 
 ## Symptom: undeclared sibling-workspace import not reported
 
+**This is a regression** — see the regression history table below. Versions
+2.x through 5.6.1 detected this bug in all three failure modes listed; 5.7.0
+broke per-package mode (release notes: *"Start using `resolve` as the default
+module resolver"*); monorepo mode recovered briefly in 5.17.0 – 6.13.1 but
+regressed again at 6.14.0.
+
 **myRepo/packages/consumer/package.json** (see [simplified reproduction](https://github.com/astegmaier/playground-knip-undetected-dependency-bug/blob/main/packages/consumer/package.json))
 
 ```json
@@ -137,3 +143,23 @@ per-package vs. monorepo asymmetry and matches the path the unresolved-imports
 branch already takes.
 
 I'm happy to take a stab at the PR if you're open to the change.
+
+## Regression history
+
+I bisected this against npm-published versions using a minimal harness in the
+[reproduction repo](https://github.com/astegmaier/playground-knip-undetected-dependency-bug).
+The three failure modes I tested:
+
+- **A** = per-package mode, default (`cd packages/consumer && knip`)
+- **B** = per-package mode, `--strict`
+- **C** = monorepo mode, default (`knip` from root)
+
+| knip version | A | B | C | Trigger |
+|---|---|---|---|---|
+| 2.x – 5.6.1 | ✅ | ✅ | ✅ | All three patterns detect the bug |
+| **5.7.0** – 5.16.x | ❌ | ❌ | ❌ | Per-package and monorepo both regressed. Release notes: *"Start using `resolve` as the default module resolver"* |
+| 5.17.0 – 6.13.1 | ❌ | ❌ | ✅ | Monorepo silently recovered; per-package still broken |
+| **6.14.0** – 6.16.1 | ❌ | ❌ | ❌ | Monorepo regressed again — commit [`e7122a1ae`](https://github.com/webpro-nl/knip/commit/e7122a1ae74d8d43f6301b8758b7348c91fb4779) |
+
+Monorepo mode + `--strict` detects the bug in every version 2.x – 6.16.1 —
+that's the only currently-reliable invocation.

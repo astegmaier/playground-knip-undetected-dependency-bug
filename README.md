@@ -83,3 +83,39 @@ yarn knip --strict
 - Related closed issue [#1711](https://github.com/webpro-nl/knip/issues/1711) — same triggering conditions
   (per-package invocation + hoisting), different code path (manifest loading
   vs. import-graph filtering).
+
+## Regression history
+
+All three current failure modes are regressions — they were detected by older
+knip versions:
+
+| Range | per-pkg default | per-pkg `--strict` | monorepo default | Note |
+|---|---|---|---|---|
+| 2.x – 5.6.1 | ✅ | ✅ | ✅ | All three patterns detect the bug |
+| **5.7.0** – 5.16.x | ❌ | ❌ | ❌ | Regression — release notes: *"Start using `resolve` as the default module resolver"* |
+| 5.17.0 – 6.13.1 | ❌ | ❌ | ✅ | Monorepo mode silently recovers (per-pkg still broken) |
+| **6.14.0** – 6.16.1 | ❌ | ❌ | ❌ | Second regression in monorepo mode — commit [`e7122a1ae`](https://github.com/webpro-nl/knip/commit/e7122a1ae74d8d43f6301b8758b7348c91fb4779) ("Don't flag undeclared sibling workspace imports as unlisted") |
+
+Throughout the entire 2.x – 6.16.1 range, **monorepo mode + `--strict` always
+detects the bug** — this is the only currently-reliable invocation.
+
+Hypothesis: the per-package regression in 5.7.0 likely traces to the module
+resolver switch. Before 5.7.0, knip relied on TS's own resolution; the
+sibling-workspace import would land in `file.imports.unresolved` (which is
+unconditionally classified as `unlisted`) instead of being silently filtered
+by the gate at `graph/build.ts:432-444` that drops *resolved* imports for
+non-workspace, non-declared packages.
+
+### How to reproduce the regression history
+
+```bash
+# Use the harness in this repo
+node_modules/.bin/knip --workspace packages/consumer --strict  # always detects, all versions
+
+# Bisect — install any version and re-run the four patterns:
+npm install --no-save knip@5.6.1   # all three patterns detect ✓
+npm install --no-save knip@5.7.0   # all three patterns miss ✗
+npm install --no-save knip@5.17.0  # monorepo recovers ✓, per-pkg still broken ✗
+npm install --no-save knip@6.13.1  # same — monorepo ✓, per-pkg ✗
+npm install --no-save knip@6.14.0  # monorepo regresses again ✗
+```
