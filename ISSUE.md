@@ -33,93 +33,68 @@ Knip silently fails to detect a missing dependency declaration when **both** of 
 
 This is the same triggering pair as [#1711](https://github.com/webpro-nl/knip/issues/1711), but a different underlying code path.
 
-### Symptom: undeclared sibling-workspace import not reported
+## Example
 
-**myRepo/packages/consumer/package.json** (see [simplified reproduction](https://github.com/astegmaier/playground-knip-undetected-dependency-bug/blob/main/packages/consumer/package.json))
+Given this simplified repro structure:
 
-```json
-{
-  "name": "@scope/consumer",
-  "private": true,
-  "devDependencies": {
-    "knip": "6.16.1"
-  }
-}
 ```
-
-**myRepo/packages/consumer/src/index.ts**
-
-```ts
-import { apple } from '@scope/fruit'; // ← @scope/fruit is NOT declared in consumer's package.json
-export const x = apple;
+packages/
+  fruit/
+    src/index.ts       # export const apple = 'apple';
+    package.json       # name: "@scope/fruit"
+  consumer/
+    src/index.ts       # import { apple } from '@scope/fruit';   ← undeclared usage
+    package.json       # devDependencies: { "knip": "6.16.1" }   ← does NOT declare @scope/fruit
+package.json           # root, workspaces: ["packages/*"]
 ```
 
 `@scope/fruit` is a sibling workspace. Yarn classic hoists it to the root `node_modules/@scope/fruit` (as a symlink to `packages/fruit`), so TS resolves the import from `packages/consumer` without complaint.
 
-Running knip from the workspace root with `--strict` will (correctly) report the missing declaration:
+You'll get these results...
 
-```
-yarn knip --strict
+### Per-package mode — **silently passes (BUG)**
 
-Unlisted dependencies (1)
-@scope/fruit  packages/consumer/src/index.ts:1:10
-```
-
-But running knip from the consumer directory will (incorrectly) report nothing:
-
-```
+```bash
 cd packages/consumer
 yarn knip
 # → exit 0, no output
+```
 
+Expected: `Unlisted dependencies (1)  @scope/fruit  src/index.ts:1:10`.
+
+### Per-package mode + `--strict` — still silently passes (BUG)
+
+```bash
 yarn knip --strict
 # → exit 0, no output
 ```
 
-Note that `--strict` does **not** fix the per-package case — the silent drop happens before any strict-mode logic runs.
+### Monorepo mode (default) — silently passes (in knip ≥ 6.14.0)
 
-### Regression history
-
-I bisected this against npm-published versions using a minimal harness in the [reproduction repo](https://github.com/astegmaier/playground-knip-undetected-dependency-bug). The three failure modes I tested:
-
-- **A** = per-package mode, default (`cd packages/consumer && knip`)
-- **B** = per-package mode, `--strict`
-- **C** = monorepo mode, default (`knip` from root)
-
-Every release from 2.x through **5.6.1** detected the bug in all three modes. **5.7.0** broke all three, and per-package mode (A and B) has been silently broken in every release since. The release notes for 5.7.0 read *"Start using `resolve` as the default module resolver"* — this matches the root-cause analysis below.
-
-A side note for completeness: a refactor in **5.17.0** unintentionally surfaced the bug again in monorepo mode (C) only — that window lasted until **6.14.0** (commit [`e7122a1ae`](https://github.com/webpro-nl/knip/commit/e7122a1ae74d8d43f6301b8758b7348c91fb4779), bundled into a different PR) deliberately suppressed sibling-workspace imports in non-strict mode and re-broke C. Per-package mode (A and B) was unaffected by either of those changes and has been silently passing this entire time.
-
-The only currently-reliable invocation is **monorepo mode + `--strict`**, which detects the bug in every version 2.x – 6.16.1.
-
-### Root cause analysis
-
-In `packages/knip/src/graph/build.ts` (`analyzeSourceFile`), resolved imports are added to `file.imports.external` only if the imported package is a known workspace _or_ already declared in the current workspace's `package.json` ([build.ts#L432-L444](https://github.com/webpro-nl/knip/blob/knip%406.16.1/packages/knip/src/graph/build.ts#L432-L444)):
-
-```ts
-const wsDependencies = deputy.getDependencies(workspace.name);
-for (const _import of file.imports.imports) {
-  if (!_import.filePath) continue;
-  const packageName = getPackageNameFromModuleSpecifier(_import.specifier);
-  if (!packageName) continue;
-  const isWorkspace = isInternalWorkspace(packageName);
-  if (isWorkspace || wsDependencies.has(packageName)) {
-    file.imports.external.add({ ..._import, specifier: packageName });
-    ...
-  }
-}
+```bash
+cd ../..
+yarn knip
+# → exit 0, no output
 ```
 
-The `unlisted` check in `graph/analyze.ts` only walks `file.imports.external`, so any import that fails this gate is silently invisible to the analyzer.
+### Monorepo mode + `--strict` — correctly detects ✓
 
-When knip runs in per-package mode, only the consumer workspace's `package.json` is loaded (the consumer doesn't declare a `workspaces` field), so `availableWorkspacePkgNames` is empty and `isInternalWorkspace(packageName)` returns false for every sibling. Combined with the missing declaration, **both branches of the `if` are false → the import is silently dropped** and never reaches the unlisted-dependency check.
+```bash
+yarn knip --strict
+# → Unlisted dependencies (1)
+#     @scope/fruit  packages/consumer/src/index.ts:1:10
+# → exit 1
+```
 
-For comparison, **unresolved** imports take a different code path ([build.ts#L404-L420](https://github.com/webpro-nl/knip/blob/knip%406.16.1/packages/knip/src/graph/build.ts#L404-L420)) that adds anything package-name-shaped to `file.imports.external` unconditionally. That's why this same code _correctly_ reports missing declarations when the repo is installed with pnpm's default (strict / non-hoisted) layout: the import doesn't resolve, falls into the "unresolved" branch, and is properly classified as `unlisted`. The same asymmetry explains the 5.7.0 regression — before 5.7.0 knip leaned more heavily on TypeScript's own resolution, so the sibling-workspace import landed in `file.imports.unresolved` and was caught; the *"Start using `resolve` as the default module resolver"* change in 5.7.0 caused it to resolve through hoisting and fall into the silent-drop gate instead.
+## Regression history
 
-I observed this exact asymmetry in our monorepo: after removing a dependency declaration from two packages, `yarn knip --continue` (per-package mode, yarn classic hoisting) reported zero issues, while running the same analysis after re-installing with pnpm correctly surfaced both packages as having unlisted dependencies.
+I bisected this against npm-published versions using a minimal harness in the [reproduction repo](https://github.com/astegmaier/playground-knip-undetected-dependency-bug). The four invocations from the Example section above are labelled A/B/C/D below (B — monorepo + `--strict` — is omitted from the table since it correctly detects in every version 2.x – 6.16.1):
 
-### Suggested direction
+| Range | A monorepo default | C per-pkg default | D per-pkg `--strict` | Trigger |
+|---|---|---|---|---|
+| 2.x – **5.6.1** | ✅ | ✅ | ✅ | All patterns detect |
+| **5.7.0** – 5.16.x | ❌ | ❌ | ❌ | Release notes: *"Start using `resolve` as the default module resolver"* |
+| 5.17.0 – 6.13.1 | ✅ | ❌ | ❌ | A silently recovered (incidental side effect of a refactor); C/D still broken |
+| **6.14.0** – 6.16.1 | ❌ | ❌ | ❌ | A regressed again — commit [`e7122a1ae`](https://github.com/webpro-nl/knip/commit/e7122a1ae74d8d43f6301b8758b7348c91fb4779) deliberately suppressed sibling-workspace imports in non-strict mode |
 
-Always add resolved external imports to `file.imports.external` when they target a package that isn't part of the current workspace's transitive type-includes set, and let `DependencyDeputy.maybeAddReferencedExternalDependency` make the final call about whether it's `unlisted`. That collapses the per-package vs. monorepo asymmetry and matches the path the unresolved-imports branch already takes.
-
-I'm happy to take a stab at the PR if you're open to the change.
+The main story is the **5.6.1 → 5.7.0** regression: it broke per-package mode (C/D) and that mode has been silently broken in every release for ~15 months and counting. The 5.17.0 / 6.14.0 movements in monorepo mode (A) are a side note — neither affected per-package mode.
