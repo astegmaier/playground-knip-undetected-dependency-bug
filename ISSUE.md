@@ -1,6 +1,6 @@
 ## Title
 
-🔄 Regression: knip silently fails to detect missing dependency declarations when run from a workspace package directory under hoisting
+🔄 Regression: knip fails to detect missing dependency declarations for sibling workspace packages when there is hoisting
 
 ## Prerequisites
 
