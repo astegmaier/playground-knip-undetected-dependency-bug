@@ -58,10 +58,15 @@ yarn knip
 # → exit 0, no output
 ```
 
-This is intentional per [#1742](https://github.com/webpro-nl/knip/pull/1742) ("Don't flag undeclared sibling
-workspace imports as unlisted") which landed in 6.14.0, but is debatable —
-sibling workspaces are still external from a `package.json` correctness
-perspective.
+In knip ≥ 6.14.0, commit
+[`e7122a1ae`](https://github.com/webpro-nl/knip/commit/e7122a1ae74d8d43f6301b8758b7348c91fb4779)
+added a short-circuit in `DependencyDeputy.maybeAddReferencedExternalDependency`
+that silently marks any sibling-workspace import as referenced in non-strict
+mode. The commit ships a test asserting this behavior. (Note: the commit title
+references `(#1742)`, but issue
+[#1742](https://github.com/webpro-nl/knip/issues/1742) is actually about
+peer/dev dependency duplication; the sibling-workspace change appears to have
+been bundled into the same PR but isn't called out in the issue thread.)
 
 ### Monorepo mode + `--strict` — correctly detects ✓
 
