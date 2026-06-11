@@ -61,8 +61,6 @@ yarn knip
 # ✂️  Excellent, Knip found no issues.
 ```
 
-Expected: `Unlisted dependencies (1)  @scope/fruit  src/index.js:1:10`.
-
 ### Run knip from workspace package + `--strict` — silently passes (BUG)
 
 ```bash
