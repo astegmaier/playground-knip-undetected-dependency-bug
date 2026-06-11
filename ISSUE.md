@@ -42,18 +42,15 @@ packages/
   consumer/
     src/index.js       # import { apple } from '@scope/fruit'; ← undeclared usage
     package.json       # does NOT declare `@scope/fruit` as a dependency
-package.json           # root, workspaces: ["packages/*"], devDependencies: { "knip": "6.16.1" }
+package.json           # workspaces: ["packages/*"]
 .yarnrc.yml            # nodeLinker: node-modules
 ```
 
-`@scope/fruit` is a sibling workspace. yarn berry (with `nodeLinker: node-modules`) symlinks it to root `node_modules/@scope/fruit` (pointing at `packages/fruit`), so node module resolution finds the import from `packages/consumer` without complaint.
+You'll get these results with the latest version of knip (`6.16.1`)...
 
-You'll get these results...
-
-### Run knip from root — silently passes
+### Run knip from root — silently passes (BUG)
 
 ```bash
-cd ../..
 yarn knip
 # ✂️  Excellent, Knip found no issues.
 ```
